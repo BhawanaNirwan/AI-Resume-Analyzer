@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import tempfile
 import pymupdf
 
 from flask import Flask, request, jsonify
@@ -13,13 +14,10 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
 api_key = os.getenv("GEMINI_API_KEY")
 
 if not api_key:
-    raise ValueError("GEMINI_API_KEY is not set in the .env file.")
+    raise ValueError("GEMINI_API_KEY is not set.")
 
 client = genai.Client(api_key=api_key)
 
@@ -60,9 +58,6 @@ Analyze the candidate's resume against the provided job description.
 Do not invent information.
 
 Do not claim the candidate has a skill unless it appears in the resume.
-
-Do not invent work experience, projects, certifications, education,
-achievements, or skills.
 
 Missing skills must be based on requirements in the job description.
 
@@ -166,7 +161,7 @@ def analyze():
         ""
     ).strip()
 
-    if resume.filename == "":
+    if not resume.filename:
         return jsonify({
             "error": "Please select a resume."
         }), 400
@@ -181,16 +176,16 @@ def analyze():
             "error": "Please enter a job description."
         }), 400
 
-    safe_filename = os.path.basename(resume.filename)
-
-    file_path = os.path.join(
-        UPLOAD_FOLDER,
-        safe_filename
-    )
+    file_path = None
 
     try:
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=".pdf"
+        ) as temp_file:
 
-        resume.save(file_path)
+            file_path = temp_file.name
+            resume.save(file_path)
 
         resume_text = extract_text_from_pdf(file_path)
 
@@ -216,7 +211,7 @@ def analyze():
 
     finally:
 
-        if os.path.exists(file_path):
+        if file_path and os.path.exists(file_path):
             os.remove(file_path)
 
 
