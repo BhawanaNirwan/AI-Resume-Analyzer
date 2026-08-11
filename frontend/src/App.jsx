@@ -8,7 +8,7 @@ import {
   Lightbulb,
   MessageSquare,
   Target,
-  RotateCcw
+  RotateCcw,
 } from "lucide-react";
 
 function App() {
@@ -21,21 +21,23 @@ function App() {
   const handleFileChange = (event) => {
     const file = event.target.files[0];
 
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
     if (file.type !== "application/pdf") {
       setError("Please upload a PDF resume.");
+      setResume(null);
       return;
     }
 
     setResume(file);
     setError("");
-    setResult(null);
   };
 
   const analyzeResume = async () => {
     if (!resume) {
-      setError("Please upload your resume.");
+      setError("Please upload your resume PDF.");
       return;
     }
 
@@ -54,28 +56,41 @@ function App() {
     formData.append("job_description", jobDescription);
 
     try {
-      const response = await fetch(
-        "/api/analyze",
-        {
-          method: "POST",
-          body: formData
-        }
-      );
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        body: formData,
+      });
 
-      const data = await response.json();
+      const responseText = await response.text();
 
-      if (!response.ok) {
+      let data;
+
+      try {
+        data = JSON.parse(responseText);
+      } catch {
         throw new Error(
-          data.error || "Analysis failed."
+          responseText ||
+            `Server returned an invalid response (${response.status}).`
         );
       }
 
-      setResult(data);
+      if (!response.ok) {
+        throw new Error(
+          data.error || `Analysis failed (${response.status}).`
+        );
+      }
 
+      if (!data || typeof data !== "object") {
+        throw new Error("Invalid response received from the server.");
+      }
+
+      setResult(data);
     } catch (err) {
+      console.error("Analysis error:", err);
+
       setError(
         err.message ||
-        "Unable to connect to the backend."
+          "Something went wrong while analyzing your resume."
       );
     } finally {
       setLoading(false);
@@ -91,16 +106,13 @@ function App() {
 
   return (
     <div className="app">
-
       <header className="hero">
-
         <div className="logo">
           <Sparkles size={24} />
           <span>ResumeAI</span>
         </div>
 
         <div className="hero-content">
-
           <div className="badge">
             <Sparkles size={16} />
             Powered by Gemini AI
@@ -115,34 +127,24 @@ function App() {
             Upload your resume and compare it with any job
             description to get AI-powered career insights.
           </p>
-
         </div>
-
       </header>
 
       <main className="container">
-
         {!result && (
-
           <section className="analyzer-card">
-
             <div className="section-header">
-
               <div>
                 <h2>Analyze Your Resume</h2>
-
                 <p>
                   Upload your resume and paste the job
                   description below.
                 </p>
               </div>
-
             </div>
 
             <div className="upload-section">
-
               <label className="upload-box">
-
                 <input
                   type="file"
                   accept=".pdf"
@@ -163,16 +165,11 @@ function App() {
                     ? "PDF selected"
                     : "Click to browse PDF files"}
                 </p>
-
               </label>
-
             </div>
 
             <div className="job-section">
-
-              <label>
-                Job Description
-              </label>
+              <label>Job Description</label>
 
               <textarea
                 value={jobDescription}
@@ -186,19 +183,13 @@ function App() {
               <div className="character-count">
                 {jobDescription.length} characters
               </div>
-
             </div>
 
             {error && (
-
               <div className="error-box">
-
                 <AlertCircle size={20} />
-
                 <span>{error}</span>
-
               </div>
-
             )}
 
             <button
@@ -206,7 +197,6 @@ function App() {
               onClick={analyzeResume}
               disabled={loading}
             >
-
               {loading ? (
                 <>
                   <span className="spinner"></span>
@@ -218,13 +208,10 @@ function App() {
                   Analyze Resume
                 </>
               )}
-
             </button>
 
             {loading && (
-
               <div className="loading-box">
-
                 <div>
                   <FileText size={18} />
                   Extracting resume information
@@ -239,62 +226,44 @@ function App() {
                   <Sparkles size={18} />
                   Generating AI insights
                 </div>
-
               </div>
-
             )}
-
           </section>
-
         )}
 
         {result && (
-
           <Results
             result={result}
             resetAnalysis={resetAnalysis}
           />
-
         )}
-
       </main>
 
       <footer>
         <p>
-          AI Resume Analyzer • Built with React,
-          Flask & Gemini
+          AI Resume Analyzer • Built with React, Flask & Gemini
         </p>
       </footer>
-
     </div>
   );
 }
 
-
 function Results({ result, resetAnalysis }) {
-
   return (
-
     <section className="results">
-
       <div className="results-header">
-
         <div>
-
           <div className="badge">
             <Sparkles size={16} />
             AI Analysis Complete
           </div>
 
-          <h2>
-            Your Resume Analysis
-          </h2>
+          <h2>Your Resume Analysis</h2>
 
           <p>
             Here's how your resume matches the job
             description.
           </p>
-
         </div>
 
         <button
@@ -304,14 +273,10 @@ function Results({ result, resetAnalysis }) {
           <RotateCcw size={18} />
           Analyze Another
         </button>
-
       </div>
 
-
       <div className="score-grid">
-
         <div className="score-card">
-
           <div className="score-icon">
             <FileText />
           </div>
@@ -319,15 +284,12 @@ function Results({ result, resetAnalysis }) {
           <span>Resume Score</span>
 
           <strong>
-            {result.resume_score}
+            {result.resume_score ?? 0}
             <small>/100</small>
           </strong>
-
         </div>
 
-
         <div className="score-card">
-
           <div className="score-icon">
             <Target />
           </div>
@@ -335,32 +297,22 @@ function Results({ result, resetAnalysis }) {
           <span>Job Match</span>
 
           <strong>
-            {result.job_match_percentage}
+            {result.job_match_percentage ?? 0}
             <small>%</small>
           </strong>
-
         </div>
-
       </div>
 
-
       <div className="result-grid">
-
         <div className="result-card">
-
           <div className="card-title">
-
             <CheckCircle />
-
             <h3>Matching Skills</h3>
-
           </div>
 
           <div className="skill-list">
-
-            {result.matching_skills?.map(
-              (skill, index) => (
-
+            {result.matching_skills?.length > 0 ? (
+              result.matching_skills.map((skill, index) => (
                 <span
                   className="skill matching"
                   key={index}
@@ -368,30 +320,22 @@ function Results({ result, resetAnalysis }) {
                   <CheckCircle size={15} />
                   {skill}
                 </span>
-
-              )
+              ))
+            ) : (
+              <p>No matching skills found.</p>
             )}
-
           </div>
-
         </div>
 
-
         <div className="result-card">
-
           <div className="card-title">
-
             <AlertCircle />
-
             <h3>Missing Skills</h3>
-
           </div>
 
           <div className="skill-list">
-
-            {result.missing_skills?.map(
-              (skill, index) => (
-
+            {result.missing_skills?.length > 0 ? (
+              result.missing_skills.map((skill, index) => (
                 <span
                   className="skill missing"
                   key={index}
@@ -399,120 +343,77 @@ function Results({ result, resetAnalysis }) {
                   <AlertCircle size={15} />
                   {skill}
                 </span>
-
-              )
+              ))
+            ) : (
+              <p>No major missing skills identified.</p>
             )}
-
           </div>
-
         </div>
-
       </div>
 
-
       <div className="result-card">
-
         <div className="card-title">
-
           <Target />
-
           <h3>ATS-Friendly Keywords</h3>
-
         </div>
 
-        <div className="keyword-list">
-
-          {result.ats_keywords?.map(
-            (keyword, index) => (
-
+        <div className="skill-list">
+          {result.ats_keywords?.length > 0 ? (
+            result.ats_keywords.map((keyword, index) => (
               <span
-                className="keyword"
+                className="skill matching"
                 key={index}
               >
                 {keyword}
               </span>
-
-            )
+            ))
+          ) : (
+            <p>No ATS keywords returned.</p>
           )}
-
         </div>
-
       </div>
 
-
       <div className="result-card">
-
         <div className="card-title">
-
           <Lightbulb />
-
           <h3>Suggested Improvements</h3>
-
         </div>
 
-        <div className="improvement-list">
-
-          {result.improvements?.map(
-            (item, index) => (
-
-              <div
-                className="improvement"
-                key={index}
-              >
-
-                <span>
-                  {index + 1}
-                </span>
-
-                <p>{item}</p>
-
-              </div>
-
-            )
+        <ul className="improvement-list">
+          {result.improvements?.length > 0 ? (
+            result.improvements.map((item, index) => (
+              <li key={index}>
+                <Lightbulb size={18} />
+                <span>{item}</span>
+              </li>
+            ))
+          ) : (
+            <li>No improvement suggestions returned.</li>
           )}
-
-        </div>
-
+        </ul>
       </div>
-
 
       <div className="result-card">
-
         <div className="card-title">
-
           <MessageSquare />
-
           <h3>Interview Questions</h3>
-
         </div>
 
-        <div className="question-list">
-
-          {result.interview_questions?.map(
-            (question, index) => (
-
-              <div
-                className="question"
-                key={index}
-              >
-
-                <span>
-                  {String(index + 1).padStart(2, "0")}
-                </span>
-
-                <p>{question}</p>
-
-              </div>
-
+        <ol className="question-list">
+          {result.interview_questions?.length > 0 ? (
+            result.interview_questions.map(
+              (question, index) => (
+                <li key={index}>
+                  {question}
+                </li>
+              )
             )
+          ) : (
+            <li>No interview questions returned.</li>
           )}
-
-        </div>
-
+        </ol>
       </div>
-
     </section>
-
   );
 }
 
