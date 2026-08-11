@@ -56,7 +56,7 @@ function App() {
     formData.append("job_description", jobDescription);
 
     try {
-      const response = await fetch("/api/analyze", {
+      const response = await fetch("https://ai-resume-analyzer-q6sz.onrender.com/api/analyze", {
         method: "POST",
         body: formData,
       });
